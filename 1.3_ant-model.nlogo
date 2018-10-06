@@ -1,9 +1,10 @@
 turtles-own [
   food-eaten
-  carrying-food
+  carrying-food?
 ]
 patches-own [
   nest?
+  pheremone
 ]
 
 to setup
@@ -17,11 +18,11 @@ to setup
     set size 2
     set color red
     set food-eaten 0
-    set carrying-food 0
+    set carrying-food? false
   ]
   ask patches
   [
-   setup-nest
+   setup-patches
   ]
   grow-food
 end
@@ -30,27 +31,15 @@ to go
   if not any? patches with [pcolor = green] [stop]
   ask turtles
   [
-    ifelse carrying-food = 0
+    ifelse carrying-food?
     [
-      ifelse coin-flip? [right random max-turn-angle][left random max-turn-angle]  ; if coin-flip? is true, turn right else turn left
-      forward random max-step-size
-      if pcolor = green ; if the turtle is located on a green patch
-      [
-       set pcolor black
-       set food-eaten (food-eaten + 1)
-       set carrying-food 1
-       set color blue
-      ]
+      return-to-nest
     ]
     [
-      face patch 0 0; face nest
-      forward random max-step-size
-      if nest? [
-        set carrying-food 0
-        set color yellow
-      ]
+      look-for-food
     ]
   ]
+  evaportate-pheremone
   tick
 end
 
@@ -72,8 +61,61 @@ to grow-food
   ]
 end
 
-to setup-nest
-  set nest? (distancexy 0 0) < 9
+to look-for-food
+  let pheremone-ahead? scent-at-angle 0
+  let pheremone-right? scent-at-angle 45
+  let pheremone-left? scent-at-angle -45
+
+  ifelse (pheremone-right? > pheremone-ahead? or pheremone-left? > pheremone-ahead?)
+  [ifelse pheremone-right? > pheremone-left?
+    [rt 45]
+    [lt 45]
+  ]
+   [if pheremone = 0
+    [ifelse coin-flip? [right random max-turn-angle][left random max-turn-angle]]  ; if coin-flip? is true, turn right else turn left
+     forward random max-step-size
+     if pcolor = green ; if the turtle is located on a green patch
+     [
+       set pcolor black
+       set food-eaten (food-eaten + 1)
+       set carrying-food? true
+       set color blue ; turtle is blue when carrying food back to nest
+      ]
+   ]
+end
+
+to return-to-nest
+  face patch 0 0; face nest
+  forward 1
+  set pheremone pheremone + 1
+  ;set pcolor white
+  set plabel pheremone
+  if nest? [
+    set carrying-food? false
+    set color yellow ; turtle is yellow when looking for food
+   ]
+end
+
+to setup-patches
+  set pheremone 0
+  set nest? (distancexy 0 0) < 2
+  if nest? [set pcolor brown]
+end
+
+to evaportate-pheremone
+  let x random-float 1
+  ask patches with [pheremone > 0]
+  [if x < probability-to-evaporate
+    [set pheremone pheremone - 1]
+    ;set pcolor white
+    set plabel pheremone
+  ]
+end
+
+to-report scent-at-angle [angle]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [report 0]
+  report [pheremone] of p
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -163,10 +205,10 @@ NIL
 HORIZONTAL
 
 PLOT
--1
-229
-209
-418
+-5
+313
+205
+502
 Total Food Eaten
 Time
 Total Food Eaten
@@ -206,6 +248,21 @@ max-turn-angle
 180
 60.0
 1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+12
+225
+183
+258
+probability-to-evaporate
+probability-to-evaporate
+0
+1
+0.0
+0.1
 1
 NIL
 HORIZONTAL
